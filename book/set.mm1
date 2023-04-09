@@ -1,63 +1,6 @@
--- TODO:
--- * Split file into many:
---   * README.md with phylosophy, reading dependence DAG in mermaid, index, TODO
---   * Individual files with chapters/sections, tactics
---   * Experimentations with mm1
--- * Organize how tactics should be presented
--- * Polish deduction tactics
--- * Try to make i -> d -> c theorem forms more uniform
--- * clean duplicated statements
--- * move mp_dd and syl_d down. Together with conjunction, a section on joining
---   hypotheses. Explain that it is natural to join hypotheses or theses in conjunctions.
---   Then give as an example the double deduction.
--- * conjunction + joining hypotheses
--- * disjunction + case analysis
--- * insert a deduction tactic chapter after disjunction? There is the issue that
---   contracting a single hypotheses did not happen yet. But I don't see it as a big obstacle.
--- * equivalence is a much bigger section. Perhaps ending with a chapter about the substitution
---   tactic.
--- * really do a section on truth tables ending with a tactic? Perhaps it is not as useful.
-
--- Suggestions for mm1:
--- * Use quotes instead of dolars: "p -> q". look at how Isabelle HOL looks much better
--- * Theorem labels should allow other symbols, like `-`, perhaps `.`.
--- * Should the scripting language be typed? Type driven development helps a lot.
---   In this case, it should guide us in finding which theorems to use, what to match...
--- * Missing variables should be warned, like `(ax_mp a)`.
--- * It is good to have non-complete ordering of precedence, giving error in cases
---   of ambiguity (example $->$ and $<->$ are often a source of bugs).
--- * Missing ; sends error down.
--- * Documentation is scarse. mm1.md is too condensed.
--- * Tactics are too implicit and imperative. Take refine for example. I would much rather
---   pass the goal and metavariables as arguments to refine and have the proof be returned.
-
--- Questions to Mario:
--- * how to make `(have 'c $a -> b$ 'not-valid)` return an error there instead of later?
-
--- Book phylosophy
--- * empowering - people reading should feel like they could write it
--- * familiar - notation/statements should mimic what mathematicians are used to.
---   This helps with understanding the material, reduces learning curve, reduces feeling that
---   formal methods are alien, thus improves empowerment.
--- * mnemonic - people should not have to memorize thousands of things like syl6. For this:
---     * Present fewer results (even if future proofs involve more steps).
---     * Rely on familiarity to decide what to introduce (easier to remember familiar things)
---     * Create patterns accross the book (for example, deduction style being always the same)
--- * Good choice of divisions (multiscale: book, chapter, section):
---     * good encapsulation
---     * small surface of interaction
---     * DAG of dependencies
--- * Can be read skipping the tactics code, just learning what they do instead.
-
-
 delimiter $ ( ) ~ { } $;
 strict provable sort wff;
 
--- annotations look nice, but the proof is again not easy to use
--- do {
---   (def last (match-fn [(a) a] [(_ . l) (last l)]))
---   (def (annotate e s) @ match e [_ (print @ last @ get-decl s)])
--- };
 
 -- # Axioms
 
@@ -76,12 +19,6 @@ axiom ax_3 (a b: wff): $(~a -> ~b) -> b -> a$;
 --| Modus ponens: from `a -> b` and `a`, infer `b`.
 axiom ax_mp (a b: wff) (h1: $a$) (h2: $a -> b$): $b$;
 
---| Expand a proof into a string
-do {(def (expand p) (begin (have 'expanded-term p) (pp @ infer-type 'expanded-term)))};
-do {
-    (def dbg @ match-fn* [(x) (print x) x]
-    [(x y) (display @ string-append (->string x) ": " (->string y)) y])
-};
 -- # Theorem Forms
 
 -- ## Inference Form
@@ -89,10 +26,9 @@ do {
 -- First proof (! notation)
 theorem a1_i (a b: wff) (h: $a$): $b -> a$ = (
   focus
-  --(display @ expand '(! ax_mp a $b -> a$ h (! ax_1 a b)))
   '(! ax_mp a $b -> a$ h (! ax_1 a b))
 );
--- Unification and proofs without !
+-- Explain unification and proofs without !
 theorem _ (a b: wff) (h: $a$): $b -> a$ = '(ax_mp h ax_1);
 theorem a2_i (a b: wff) (h: $a -> b -> c$): $(a -> b) -> (a -> c)$ = '(ax_mp h ax_2);
 theorem a3_i (a b: wff) (h: $~a -> ~b$): $(b -> a)$ = '(ax_mp h ax_3);
@@ -100,29 +36,18 @@ theorem a3_i (a b: wff) (h: $~a -> ~b$): $(b -> a)$ = '(ax_mp h ax_3);
 -- ## Deduction Form
 
 theorem mp_d (u a b: wff) (h1: $u -> a$) (h2: $u -> a -> b$): $u -> b$ = '(ax_mp h1 (a2_i h2));
+-- Explain focus/have
 theorem syl (a b: wff) (h1: $a -> b$) (h2: $b -> c$): $a -> c$ = (
   focus
   (have 'c1 $a -> (b -> c)$ '(a1_i h2))
   '(mp_d h1 c1)
 );
--- just use syl
+-- To obtain deduction form here, just use syl
 theorem a1_d (a b c: wff) (h: $a -> b$): $a -> (c -> b)$ = '(syl h ax_1);
 theorem a2_d (u a b c: wff) (h: $u -> (a -> (b -> c))$): $u -> ((a -> b) -> (a -> c))$ = '(syl h ax_2);
 theorem a3_d (a b c: wff) (h: $a -> (~b -> ~c)$): $a -> (c -> b)$ = '(syl h ax_3);
 
--- double deduction
-theorem mp_dd (u v a b: wff)
-  (h1: $u -> v -> a$) (h2: $u -> v -> a -> b$): $u -> v -> b$ = '(
-    mp_d h1 (a2_d h2)
-  );
--- syl deduction (recall syl used mp_d already, now we need mp_dd)
-theorem syl_d (u a b: wff)
-  (h1: $u -> (a -> b)$) (h2: $u -> (b -> c)$): $u -> (a -> c)$ = (
-    focus
-    (have 'c $u -> a -> b -> c$ '(a1_d h2))
-    '(mp_dd h1 c)
-);
--- exercise: prove syl_dd
+
 
 theorem id: $a -> a$ = (
   focus
@@ -136,58 +61,31 @@ theorem id: $a -> a$ = (
 --| contradiction implies anything
 theorem contrad_i (a b: wff) (h: $~a$): $a -> b$ = (
   focus
-  -- uncommenting display below breaks the proof :(
-  -- (display @ expand 'a1i)
-  -- (display @ expand '(! a1i $~a$ $~b$ h))
   (have 'c $~b -> ~a$ '(a1_i h))  -- remove h here and see how the error is uninformative
-  --(have 'd $a -> b$ '(! a3i b a c))
-  --(display @ pp @ local-ctx)
-  --(stat)
-  --(claim 'c $~b -> ~a$ '(a1i h))  -- remove h here and see how the error is uninformative
   '(a3_i c)
-  --(have 'd $a -> b$ '(! a3i b a c))
-  --'d
 );
-
 --| contradiction deduction
--- just use deduction form everywhere
-theorem contrad_d (a b c: wff) (h: $a -> ~b$): $a -> b -> c$ = (
+-- Explain how to obtain it by just using deduction form everywhere
+theorem contrad_d (u a b: wff) (h: $u -> ~a$): $u -> a -> b$ = (
   focus
-  (have 'c $a -> (~c -> ~b)$ '(! a1_d $a$ $~b$ $~c$ h))
+  (have 'c $u -> (~b -> ~a)$ '(a1_d h))
   '(a3_d c) -- a simpler proof '(a3d (a1d h))
 );
-
---| contradiction deduction form
--- just use deduction form everywhere
-theorem _ (a b c: wff) (h: $a -> ~b$): $a -> b -> c$ = (
-  focus
-  -- it is difficult to use set-goals:
-  --(display @ pp @ get-goals)
-  --(let ([g (hd @ get-goals)]) (set-goals (ref! @ goal $a -> (~c -> ~b)$) g)) -- (goal $a -> (~c -> ~b)$))
-  --(refine '(a1d h))
-  --(have 'c $a -> (~c -> ~b)$ '(! a1d $a$ $~b$ $~c$ h))
-  (have 'c $a -> (~c -> ~b)$ '(a1_d h))
-  '(a3_d c)
-  -- a simpler proof: '(a3d (a1d h))
-);
-
 --| contradiction closed form
-theorem contrad_c (a b: wff): $~a -> a -> b$ = (
-  focus
-  (have 'c1 $~a -> ~a$ 'id)
-  (have 'c2 $~a -> a -> b$ '(contrad_d id)) -- again, remove id here and see the bad error message
-  'c2
-);
+-- Explain how one can obtain closed forms by replacing u with id.
+theorem contrad_c (a b: wff): $~a -> a -> b$ = '(contrad_d id);
 
 -- # Workout!
 
+-- Explain that this section is slightly cryptic and why. Say that
+-- we don't have the intuitive stuff yet and we are solving puzzles
+-- until we get there.
 --| absorbing redundant antecedent
 theorem redun_ant (a b: wff) (h: $a -> a -> b$): $a -> b$ = (
   focus
   (have 'c $a -> a$ 'id)
   '(mp_d c h)
 );
-
 
 -- mirabilis: pm2.18
 theorem mirab (a: wff): $(~a -> a) -> a$ = (
@@ -198,23 +96,19 @@ theorem mirab (a: wff): $(~a -> a) -> a$ = (
   '(redun_ant c3)
 );
 
--- improve proof
 --| elimiation of a nested antecedent
-theorem elim_nest_ant (a b c: wff) (h: $(a -> b) -> c$): $~a -> c$ = '(syl contrad_c h);
+theorem elim_nest_ant (a b c: wff) (h: $(a -> b) -> c$): $~a -> c$ = (
+  focus
+  (have 'c $~a -> a -> b$ 'contrad_c)
+  '(syl c h)
+);
 
 --| notnotr
 theorem notnotr (a: wff): $~~a -> a$ = (
   focus
   (have 'c $(~a -> a) -> a$ '(! mirab $a$))
   '(elim_nest_ant c)
-); -- remove the semicolon and the error goes down :(
-
--- con1i (try using notnotr directly instead of fkn nsyl2)
--- con1d?
-
--- otherwise go through:
--- mto (perhaps with not phi instead)
--- mt3d
+);
 
 theorem notnot (a: wff): $a -> ~~a$ = (
   focus
@@ -222,8 +116,9 @@ theorem notnot (a: wff): $a -> ~~a$ = (
   '(a3_i c)
 );
 
-
 --| negated implication gives antecedent
+-- Note that it can be nice to start with closed form, then do i and d.
+-- Specially now that the theory is not mature yet.
 theorem not_impl_ant_c (a b: wff): $~(a -> b) -> a$ = (
   focus
   (have 'c1 $~a -> a -> b$ 'contrad_c)
@@ -231,11 +126,11 @@ theorem not_impl_ant_c (a b: wff): $~(a -> b) -> a$ = (
   (have 'c3 $~a -> ~~(a -> b)$ '(syl c1 c2))
   '(a3_i c3)
 );
--- note that it can be nice to start with closed form, then do i and d.
 theorem not_impl_ant_i (a b: wff) (h: $~(a -> b)$): $a$ = '(ax_mp h not_impl_ant_c);
 theorem not_impl_ant_d (u a b: wff) (h: $u -> ~(a -> b)$): $u -> a$ = '(mp_d h (a1_i not_impl_ant_c));
 
 --| negated implication negates consequent
+-- Again starting with closed form.
 theorem not_impl_cons_c (a b: wff): $~(a -> b) -> ~b$ = (
   focus
   (have 'c1 $b -> (a -> b)$ 'ax_1)
@@ -254,12 +149,30 @@ theorem commute_ant_i (a b c: wff) (h: $a -> b -> c$): $b -> a -> c$ = (
 );
 
 -- try to prove closed form way above, using deduction form
--- it is difficult because we need h1 /\ h2. But we will
+-- it is difficult because we need h1 /\ h2. But we may
 -- move conjuction above
 theorem mp_c (a b: wff): $a -> (a -> b) -> b$ = '(
   commute_ant_i (! id $a -> b$)
 );
 
+-- # Double deduction
+
+-- Explain the concept, mention the fear that we would need triple...
+-- but in fact we will have conjunction to save the day. For now
+-- we still need one double deduction.
+
+theorem mp_dd (u v a b: wff)
+  (h1: $u -> v -> a$) (h2: $u -> v -> a -> b$): $u -> v -> b$ = '(
+    mp_d h1 (a2_d h2)
+  );
+-- syl deduction (recall syl used mp_d already, now we need mp_dd)
+theorem syl_d (u a b: wff)
+  (h1: $u -> (a -> b)$) (h2: $u -> (b -> c)$): $u -> (a -> c)$ = (
+    focus
+    (have 'c $u -> a -> b -> c$ '(a1_d h2))
+    '(mp_dd h1 c)
+);
+-- exercise: prove syl_dd
 
 
 -- # Contraposition
@@ -285,7 +198,6 @@ theorem contrap_not_cons_i (h: $a -> ~b$): $b -> ~a$ = (
 theorem contrap_not_cons_d (h: $u -> a -> ~b$): $u -> b -> ~a$ =
   '(a3_d (syl_d (a1_i notnotr) h)
 );
--- explain how to obtain closed from deduction
 theorem contrap_not_cons_c: $(a -> ~b) -> b -> ~a$ =
   '(contrap_not_cons_d id);
 
@@ -294,29 +206,12 @@ theorem contrap_not_ant_i (h: $~a -> b$): $~b -> a$ = (
   (have 'c $~a -> ~~b$ '(syl h notnot))
   '(a3_i c)
 );
--- in order to build deduction from another proof, tautologies get an antecedent through a1i:
+-- again, tautologies get an antecedent through a1i:
 theorem contrap_not_ant_d (h: $u -> ~a -> b$): $u -> ~b -> a$ =
   '(a3_d (syl_d h (a1_i notnot))
 );
--- explain how to obtain closed from deduction
 theorem contrap_not_ant_c: $(~a -> b) -> ~b -> a$ =
   '(contrap_not_ant_d id);
-
-
-theorem cases_i (a b: wff) (h1: $a -> b$) (h2: $~a -> b$): $b$ = (
-  focus
-  (have 'c1 $~b -> ~a$ '(contrap_i h1))
-  (have 'c2 $~b -> b$ '(syl c1 h2))
-  (have 'c3 $(~b -> b) -> b$ 'mirab)
-  '(ax_mp c2 c3)
-);
-theorem cases_d (u a b: wff)
-  (h1: $u -> (a -> b)$) (h2: $u -> (~a -> b)$): $u -> b$ = '(
-  mp_d (syl_d (contrap_d h1) h2) (a1_i mirab)
-);
--- think if we want to do the closed form now:
--- theorem cases_c (a b: wff): $(a -> b) -> (~a -> b) -> b$ = '();
-
 
 
 -- # Conjunction
@@ -337,9 +232,8 @@ theorem conj_impl_r_c: $(a /\ b) -> b$ = (
 theorem conj_impl_r_i (h: $a /\ b$): $b$ = '(ax_mp h conj_impl_r_c);
 theorem conj_impl_r_d (h: $u -> a /\ b$): $u -> b$ = '(mp_d h (a1_i conj_impl_r_c));
 
-
--- build conjunction in closed form
-theorem build_conj: $a -> b -> a /\ b$ = (
+-- Build conjunction in closed form
+theorem build_conj_c: $a -> b -> a /\ b$ = (
   focus
   (have 'c $a -> (a -> ~b) -> ~b$ 'mp_c)
   '(contrap_not_cons_d c)
@@ -347,7 +241,7 @@ theorem build_conj: $a -> b -> a /\ b$ = (
 theorem build_conj_i
   (h1: $a$) (h2: $b$): $a /\ b$ = (
   focus
-  (have 'c $b -> a /\ b$ '(ax_mp h1 build_conj))
+  (have 'c $b -> a /\ b$ '(ax_mp h1 build_conj_c))
   '(ax_mp h2 c)
 );
 
@@ -360,10 +254,13 @@ theorem repl_two_and_conj (h: $a -> b -> c$): $a /\ b -> c$ = (
   '(mp_d c3 c2)
 );
 
+-- Recall the discussion about double conjunction. Say that we are finally
+-- obtaining the last ingredient to remove the need for this.
+
 -- kind of converse of repl_two_and_conj
 theorem repl_conj_two_ant (a b c: wff) (h: $a /\ b -> c$): $a -> b -> c$ = (
   focus
-  (have 'c1 $a -> b -> a /\ b$ 'build_conj)
+  (have 'c1 $a -> b -> a /\ b$ 'build_conj_c)
   (have 'c2 $a -> a /\ b -> c$ '(a1_i h))
   '(syl_d c1 c2)
 );
@@ -376,17 +273,6 @@ theorem contrap_dd (h: $u -> v -> a -> ~b$): $u -> v -> b -> ~a$ = (
   '(repl_conj_two_ant c2)
 );
 
-theorem _
-  (h1: $a$) (h2: $b$): $a /\ b$ = (
-  focus
-  (have 'c $b -> a /\ b$ '(ax_mp h1 build_conj))
-  '(ax_mp h2 c)
-);
-theorem _: $a -> b -> a /\ b$ = (
-  focus
-  (have 'c $a -> (a -> ~b) -> ~b$ 'mp_c)
-  '(contrap_not_cons_d c)
-);
 -- improve the explanation of how to decude this. Probably try to prove _i without _c first
 theorem build_conj_d
   (h1: $u -> a$) (h2: $u -> b$): $u -> a /\ b$ = (
@@ -413,18 +299,20 @@ theorem conj_commut_c: $a /\ b -> b /\ a$ = (
   '(build_conj_d c2 c1)
 );
 
-theorem triple_conj_a (h: $a /\ b /\ c$): $a$ = (
-  focus
-  (have 'c $a /\ b$ '(conj_impl_l_i h))
-  '(conj_impl_l_i c)
-);
-theorem triple_conj_b (h: $a /\ b /\ c$): $b$ =
-  '(conj_impl_r_i (conj_impl_l_i h));
-theorem triple_conj_c (h: $a /\ b /\ c$): $c$ =
-  '(conj_impl_r_i h);
+-- turn the below into exercises:
+-- theorem triple_conj_a (h: $a /\ b /\ c$): $a$ = (
+--   focus
+--   (have 'c $a /\ b$ '(conj_impl_l_i h))
+--   '(conj_impl_l_i c)
+-- );
+-- theorem triple_conj_b (h: $a /\ b /\ c$): $b$ =
+--   '(conj_impl_r_i (conj_impl_l_i h));
+-- theorem triple_conj_c (h: $a /\ b /\ c$): $c$ =
+--   '(conj_impl_r_i h);
 
 
--- # Disjunction
+-- # Disjunction + Cases
+
 
 --| Definition of disjunction (a or b)
 def or (a b: wff): wff = $~a -> b$;
@@ -474,8 +362,23 @@ theorem disj_not_r_impl_l_i (a b: wff)
     '(disj_not_l_impl_r_i c h2)
 );
 
--- we may want to split the proof into sub-proofs
--- this can look better than having c1, ..., c9, right?
+-- ## Cases
+
+theorem cases_i (a b: wff) (h1: $a -> b$) (h2: $~a -> b$): $b$ = (
+  focus
+  (have 'c1 $~b -> ~a$ '(contrap_i h1))
+  (have 'c2 $~b -> b$ '(syl c1 h2))
+  (have 'c3 $(~b -> b) -> b$ 'mirab)
+  '(ax_mp c2 c3)
+);
+theorem cases_d (u a b: wff)
+  (h1: $u -> (a -> b)$) (h2: $u -> (~a -> b)$): $u -> b$ = '(
+  mp_d (syl_d (contrap_d h1) h2) (a1_i mirab)
+);
+-- think if we want to do the closed form now. There is the
+-- discussion abount contracting more than one hypotheses.
+-- theorem cases_c (a b: wff): $(a -> b) -> (~a -> b) -> b$ = '();
+
 theorem either_impl_disj_impl_i (a b c: wff)
   (h1: $a -> c$) (h2: $b -> c$): $(a \/ b) -> c$ = (
   focus
@@ -495,164 +398,13 @@ theorem either_impl_disj_impl_i (a b c: wff)
   '(cases_i c1 c2)
 );
 
-
-
-
 -- exercise
 --theorem eorda (h1: $a /\ b -> d$) (h2: $a /\ c -> d$):
 --  $a -> b \/ c -> d$ = '(eord (exp h1) (exp h2));
 
 
--- # Truth tables
-
-
---| Truth tables
-def true (a: wff): wff = $a \/ ~a$;
-prefix true: $True$ prec max;
-def fal (a: wff): wff = $a /\ ~a$;
-prefix fal: $F.$ prec max;
-
--- TODO this
-
-
--- # Equivalence
-
---| If and only if: `a` implies `b`, and `b` implies `a`.
-def iff (a b: wff): wff = $(a -> b) /\ (b -> a)$;
-infixl iff: $<->$ prec 20;
-
--- ## Using equivalences
-theorem equiv_impl_l (a b: wff): $(a <-> b) -> a -> b$ = 'conj_impl_l_c;
-theorem equiv_impl_r (a b: wff): $(a <-> b) -> b -> a$ = 'conj_impl_r_c;
-
--- we have already done the hard work when we proved theorems for conjunctions:
-theorem equiv_impl_both_c (a b: wff): $(a <-> b) -> (a -> b) /\ (b -> a)$ = '(build_conj_d conj_impl_l_c conj_impl_r_c);
-theorem equiv_impl_both_i (a b: wff) (h: $a <-> b$): $(a -> b) /\ (b -> a)$ = '(ax_mp h equiv_impl_both_c);
-theorem equiv_impl_both_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (a -> b) /\ (b -> a)$ = '(mp_d h (a1_i equiv_impl_both_c));
-
-theorem equiv_impl_l_i (a b: wff) (h: $a <-> b$): $a -> b$ = '(ax_mp h equiv_impl_l);
-theorem equiv_impl_r_i (a b: wff) (h: $a <-> b$): $b -> a$ = '(ax_mp h equiv_impl_r);
-
-theorem equiv_impl_l_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (a -> b)$ = '(mp_d h (a1_i equiv_impl_l));
-theorem equiv_impl_r_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (b -> a)$ = '(mp_d h (a1_i equiv_impl_r));
-
--- ## Building equivalences
-theorem build_equiv_i (a b: wff)
-  (h1: $a -> b$) (h2: $b -> a$): $a <-> b$ = '(build_conj_i h1 h2);
-theorem build_equiv_d (u a b: wff)
-  (h1: $u -> (a -> b)$) (h2: $u -> (b -> a)$): $u -> (a <-> b)$ = '(build_conj_d h1 h2);
--- explain what is being done (extract hipotheses one by one)
-theorem build_equiv_c (a b: wff): $((a -> b) /\ (b -> a)) -> (a <-> b)$ = (
-  let ([x $a -> b$] [y $b -> a$]) (
-  focus
-  (have 'c1 $,x /\ ,y -> ,x$ 'conj_impl_l_c)
-  (have 'c2 $,x /\ ,y -> ,y$ 'conj_impl_r_c)
-  '(build_equiv_d c1 c2)
-));
-
--- ## Basic properties
-theorem equiv_commut_i (a b: wff) (h: $a <-> b$): $b <-> a$ = '(conj_commut_i h);
-theorem equiv_commut_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (b <-> a)$ = '(conj_commut_d h);
-theorem equiv_commut_c (a b: wff): $(a <-> b) -> (b <-> a)$ = '(equiv_commut_d id);
-
-theorem equiv_syl_i (a b c: wff)
-  (h1: $a <-> b$) (h2: $b <-> c$): $a <-> c$ = (
-  focus
-  (have 'c1 $a -> c$ '(syl (equiv_impl_l_i h1) (equiv_impl_l_i h2)))
-  (have 'c2 $c -> a$ '(syl (equiv_impl_r_i h2) (equiv_impl_r_i h1)))
-  '(build_equiv_i c1 c2)
-);
-
-
--- MAKE A TACTIC TO DERIVE DEDUCTION form PROOFS!!!!!
-
-
--- ## Relations with other operators
-
-
--- ### Not
-
-theorem notnot_equiv: $a <-> ~~a$ = '(build_equiv_i notnot notnotr);
-
-theorem repl_equiv_not_i (a b: wff) (h: $a <-> b$): $~a <-> ~b$ = (
-  focus
-  (have 'c1 $b -> a$ '(equiv_impl_r_i h))
-  (have 'c2 $~a -> ~b$ '(contrap_i c1))
-  (have 'c3 $a -> b$ '(equiv_impl_l_i h))
-  (have 'c4 $~b -> ~a$ '(contrap_i c3))
-  '(build_equiv_i c2 c4)
-);
--- again, just translate to get deduction!!!
-theorem repl_equiv_not_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (~a <-> ~b)$ = '(
-  build_equiv_d (contrap_d (equiv_impl_r_d h)) (contrap_d (equiv_impl_l_d h))
-);
-theorem repl_equiv_not_c: $ (a <-> b) -> (~a <-> ~b) $ = '(repl_equiv_not_d id);
-
--- ### Implication
-
-theorem repl_equiv_cons_i (c a b: wff)
-  (h1: $a <-> b$) (h2: $c -> a$): $c -> b$ = (
-    focus
-    (have 'c $a -> b$ '(equiv_impl_l_i h1))
-    '(syl h2 c)
-); -- was this easier to prove because of inference form?
--- just copy...
-theorem repl_equiv_cons_d (u a b c: wff)
-  (h1: $u -> (a <-> b)$) (h2: $u -> (c -> a)$): $u -> (c -> b)$ = '(
-  syl_d h2 (equiv_impl_l_d h1)
-);
--- explain extraction of hypotheses
-theorem repl_equiv_cons_c (a b c: wff): $((a <-> b) /\ (c -> a)) -> (c -> b)$ = '(
-  repl_equiv_cons_d conj_impl_l_c conj_impl_r_c
-);
-
-
--- explain that one can contract a single hypothesis
-theorem repl_equiv_cons_ci (a b c: wff)
-  (h: $(a <-> b)$): $(c -> a) -> (c -> b)$ = '(
-  ax_mp h (repl_conj_two_ant repl_equiv_cons_c)
-);
-theorem equiv_cons_equiv_impl_i (a b c: wff) (h: $a <-> b$): $(c -> a) <-> (c -> b)$ = (
-  focus
-  (have 'c1 $(c -> a) -> (c -> b)$ '(repl_equiv_cons_ci h))
-  (have 'c2 $b <-> a$ '(equiv_commut_i h))
-  (have 'c3 $(c -> b) -> (c -> a)$ '(repl_equiv_cons_ci c2))
-  '(build_equiv_i c1 c3)
-);
-
-theorem repl_equiv_ant_i (a b c: wff)
-  (h1: $a <-> b$) (h2: $a -> c$): $b -> c$ = (
-    focus
-    (have 'c $b -> a$ '(equiv_impl_r_i h1))
-    '(syl c h2)
-);
--- we should always use u for deduction form!!!
-theorem repl_equiv_ant_d (u a b c: wff)
-  (h1: $u -> (a <-> b)$) (h2: $u -> (a -> c)$): $u -> (b -> c)$ = '(
-    syl_d (equiv_impl_r_d h1) h2
-  );
--- mention hypotheses extraction
-theorem repl_equiv_ant_c (a b c: wff): $(a <-> b) /\ (a -> c) -> (b -> c)$ = '(  -- add u in (a b c: wff) and see the weird error elsewhere
-  repl_equiv_ant_d conj_impl_l_c conj_impl_r_c
-);
--- contract a single hypothesis again
-theorem repl_equiv_ant_ci (a b c: wff)
-  (h: $(a <-> b)$): $(a -> c) -> (b -> c)$ = '(
-  ax_mp h (repl_conj_two_ant repl_equiv_ant_c)
-);
-theorem equiv_ant_equiv_impl_i (a b c: wff) (h: $a <-> b$): $(a -> c) <-> (b -> c)$ = (
-  focus
-  (have 'c1 $(a -> c) -> (b -> c)$ '(repl_equiv_ant_ci h))
-  (have 'c2 $b <-> a$ '(equiv_commut_i h))
-  (have 'c3 $(b -> c) -> (a -> c)$ '(repl_equiv_ant_ci c2))
-  '(build_equiv_i c1 c3)
-);
-
 
 --- ### Tactic for deduction?
-
--- MAKE A TACTIC TO DERIVE DEDUCTION form PROOFS!!!!!
-
 
 
 do { (def temp (ref!)) };
@@ -703,6 +455,13 @@ do {
 
 
 -- testing tactics
+theorem _ (h: $a -> ~b$): $b -> ~a$ = (record '(
+  a3_i (syl notnotr h)
+));
+-- in order to build deduction from another proof, tautologies get an antecedent through a1i:
+theorem _ (h: $u -> a -> ~b$): $u -> b -> ~a$ = temp;
+
+
 theorem _ (a b c: wff)
   (h1: $a <-> b$) (h2: $a -> c$): $b -> c$ = (record '(
     syl (equiv_impl_r_i h1) h2
@@ -712,7 +471,143 @@ theorem _ (a b c: wff)
 theorem _ (u a b c: wff)
   (h1: $u -> (a <-> b)$) (h2: $u -> (a -> c)$): $u -> (b -> c)$ = (convert_to_deduction temp);
 
--- ### Conjunction
+
+
+
+-- # Equivalence
+
+--| If and only if: `a` implies `b`, and `b` implies `a`.
+def iff (a b: wff): wff = $(a -> b) /\ (b -> a)$;
+infixl iff: $<->$ prec 20;
+
+-- ## Using equivalences
+
+-- we have already done the hard work when we proved theorems for conjunctions:
+theorem equiv_impl_l_c (a b: wff): $(a <-> b) -> (a -> b)$ = 'conj_impl_l_c;
+theorem equiv_impl_l_i (a b: wff) (h: $a <-> b$): $a -> b$ = '(ax_mp h equiv_impl_l_c);
+theorem equiv_impl_l_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (a -> b)$ = '(mp_d h (a1_i equiv_impl_l_c));
+
+theorem equiv_impl_r_c (a b: wff): $(a <-> b) -> (b -> a)$ = 'conj_impl_r_c;
+theorem equiv_impl_r_i (a b: wff) (h: $a <-> b$): $b -> a$ = '(ax_mp h equiv_impl_r_c);
+theorem equiv_impl_r_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (b -> a)$ = '(mp_d h (a1_i equiv_impl_r_c));
+
+theorem equiv_impl_both_c (a b: wff): $(a <-> b) -> (a -> b) /\ (b -> a)$ = '(build_conj_d conj_impl_l_c conj_impl_r_c);
+theorem equiv_impl_both_i (a b: wff) (h: $a <-> b$): $(a -> b) /\ (b -> a)$ = '(ax_mp h equiv_impl_both_c);
+theorem equiv_impl_both_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (a -> b) /\ (b -> a)$ = '(mp_d h (a1_i equiv_impl_both_c));
+
+
+-- ## Building equivalences
+theorem build_equiv_i (a b: wff)
+  (h1: $a -> b$) (h2: $b -> a$): $a <-> b$ = '(build_conj_i h1 h2);
+theorem build_equiv_d (u a b: wff)
+  (h1: $u -> (a -> b)$) (h2: $u -> (b -> a)$): $u -> (a <-> b)$ = '(build_conj_d h1 h2);
+-- explain what is being done (extract hipotheses one by one)
+theorem build_equiv_c (a b: wff): $((a -> b) /\ (b -> a)) -> (a <-> b)$ = (
+  let ([x $a -> b$] [y $b -> a$]) (
+  focus
+  (have 'c1 $,x /\ ,y -> ,x$ 'conj_impl_l_c)
+  (have 'c2 $,x /\ ,y -> ,y$ 'conj_impl_r_c)
+  '(build_equiv_d c1 c2)
+));
+
+-- ## Basic properties
+theorem equiv_commut_i (a b: wff) (h: $a <-> b$): $b <-> a$ = '(conj_commut_i h);
+theorem equiv_commut_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (b <-> a)$ = '(conj_commut_d h);
+theorem equiv_commut_c (a b: wff): $(a <-> b) -> (b <-> a)$ = '(equiv_commut_d id);
+
+theorem equiv_syl_i (a b c: wff)
+  (h1: $a <-> b$) (h2: $b <-> c$): $a <-> c$ = (
+  focus
+  (have 'c1 $a -> c$ '(syl (equiv_impl_l_i h1) (equiv_impl_l_i h2)))
+  (have 'c2 $c -> a$ '(syl (equiv_impl_r_i h2) (equiv_impl_r_i h1)))
+  '(build_equiv_i c1 c2)
+);
+
+
+-- # Equivalences and Other Operators
+
+
+-- ## Not
+
+theorem notnot_equiv: $a <-> ~~a$ = '(build_equiv_i notnot notnotr);
+
+theorem equiv_equiv_not_i (a b: wff) (h: $a <-> b$): $~a <-> ~b$ = (
+  focus
+  (have 'c1 $b -> a$ '(equiv_impl_r_i h))
+  (have 'c2 $~a -> ~b$ '(contrap_i c1))
+  (have 'c3 $a -> b$ '(equiv_impl_l_i h))
+  (have 'c4 $~b -> ~a$ '(contrap_i c3))
+  '(build_equiv_i c2 c4)
+);
+-- again, just translate to get deduction!!!
+theorem equiv_equiv_not_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (~a <-> ~b)$ = '(
+  build_equiv_d (contrap_d (equiv_impl_r_d h)) (contrap_d (equiv_impl_l_d h))
+);
+theorem equiv_equiv_not_c: $ (a <-> b) -> (~a <-> ~b) $ = '(equiv_equiv_not_d id);
+
+-- ## Implication
+
+theorem repl_equiv_cons_i (c a b: wff)
+  (h1: $a <-> b$) (h2: $c -> a$): $c -> b$ = (
+    focus
+    (have 'c $a -> b$ '(equiv_impl_l_i h1))
+    '(syl h2 c)
+); -- was this easier to prove because of inference form?
+-- just copy...
+theorem repl_equiv_cons_d (u a b c: wff)
+  (h1: $u -> (a <-> b)$) (h2: $u -> (c -> a)$): $u -> (c -> b)$ = '(
+  syl_d h2 (equiv_impl_l_d h1)
+);
+-- explain extraction of hypotheses using conjunction
+theorem repl_equiv_cons_c (a b c: wff): $((a <-> b) /\ (c -> a)) -> (c -> b)$ = '(
+  repl_equiv_cons_d conj_impl_l_c conj_impl_r_c
+);
+
+-- explain that one can contract a single hypothesis
+theorem repl_equiv_cons_ci (a b c: wff)
+  (h: $(a <-> b)$): $(c -> a) -> (c -> b)$ = '(
+  ax_mp h (repl_conj_two_ant repl_equiv_cons_c)
+);
+theorem equiv_cons_equiv_impl_i (a b c: wff) (h: $a <-> b$): $(c -> a) <-> (c -> b)$ = (
+  focus
+  (have 'c1 $(c -> a) -> (c -> b)$ '(repl_equiv_cons_ci h))
+  (have 'c2 $b <-> a$ '(equiv_commut_i h))
+  (have 'c3 $(c -> b) -> (c -> a)$ '(repl_equiv_cons_ci c2))
+  '(build_equiv_i c1 c3)
+);
+
+theorem repl_equiv_ant_i (a b c: wff)
+  (h1: $a <-> b$) (h2: $a -> c$): $b -> c$ = (
+    focus
+    (have 'c $b -> a$ '(equiv_impl_r_i h1))
+    '(syl c h2)
+);
+-- we should always use u for deduction form!!!
+theorem repl_equiv_ant_d (u a b c: wff)
+  (h1: $u -> (a <-> b)$) (h2: $u -> (a -> c)$): $u -> (b -> c)$ = '(
+    syl_d (equiv_impl_r_d h1) h2
+  );
+-- mention hypotheses extraction
+theorem repl_equiv_ant_c (a b c: wff): $(a <-> b) /\ (a -> c) -> (b -> c)$ = '(  -- add u in (a b c: wff) and see the weird error elsewhere
+  repl_equiv_ant_d conj_impl_l_c conj_impl_r_c
+);
+-- contract a single hypothesis again
+theorem repl_equiv_ant_ci (a b c: wff)
+  (h: $(a <-> b)$): $(a -> c) -> (b -> c)$ = '(
+  ax_mp h (repl_conj_two_ant repl_equiv_ant_c)
+);
+
+theorem equiv_ant_equiv_impl_i (a b c: wff) (h: $a <-> b$): $(a -> c) <-> (b -> c)$ = (
+  focus
+  (have 'c1 $(a -> c) -> (b -> c)$ '(repl_equiv_ant_ci h))
+  (have 'c2 $b <-> a$ '(equiv_commut_i h))
+  (have 'c3 $(b -> c) -> (a -> c)$ '(repl_equiv_ant_ci c2))
+  '(build_equiv_i c1 c3)
+);
+
+
+
+-- ## Conjunction
 
 
 
@@ -775,7 +670,7 @@ theorem equiv_r_term_equiv_conj_i (a b c: wff)
 );
 
 
--- ### Disjunction
+-- ## Disjunction
 
 theorem disj_commut_equiv_c (a b: wff): $a \/ b <-> b \/ a$ = (
   focus
@@ -832,53 +727,3 @@ theorem equiv_r_term_equiv_disj_i (a b c: wff)
 
 
 
-
-
--- add theorem through do-block
--- do {
---   (add-thm!
---     'teste
---     '[(a wff ()) (b wff ())]
---     '([h1 $a -> b$] [h2 $b -> a$])
---     $(a -> b) /\ (b -> a)$
---     ()
---     (fn () '(() (build_conj_i $a -> b$ $b -> a$ h1 h2)))
---   )
---   (print @ get-decl 'teste2)
--- };
-do {
-  (print (get-decl 'repl_equiv_conj_l_i))
-  (add-term! 'a '[(a wff ())] 'wff)
-  (add-term! 'b '[(b wff ())] 'wff)
-  (add-thm! 'h1 '[(a wff ()) (b wff ())] () '($a -> b$))
-  (add-thm! 'h2 '[(a wff ()) (b wff ())] () '($b -> a$))
-  (set-goals (goal $a <-> b$))
-  (print @ get-goals)
-  (print @ expand '(build_conj_i h1 h2))
-  (refine '(build_conj_i h1 h2))
-  (print @ get-goals)
-};
-
-
-
--- do {
---   (def dbg @ match-fn* [(x) (print x) x]
---     [(x y) (display @ string-append (->string x) ": " (->string y)) y])
---   (def last (match-fn [(a) a] [(_ . l) (last l)]))
---   (let ([p (last @ get-decl 'mp_d)])
---     (print (p))
---     )
--- };
-
--- I don't know how to get the proof from get-decl:
--- do {
---   (def last (match-fn [(a) a] [(_ . l) (last l)]))
---   (add-decl!
---   'theorem 'triple_conj_aa '((a wff ()) (b wff ()) (c wff ())) '((h (an (an a b) c))) 'a '() '(codj_impl_l_i (conj_impl_l_i h)))
---   (print (get-decl 'mp_d))
---   (let ([p (last @ get-decl 'mp_d)])
---     (p))
---     (print @ infer-type p)
---   )
---   (print @ ref! @ last @ get-decl 'mp_d)
--- };

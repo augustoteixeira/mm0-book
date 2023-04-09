@@ -1,0 +1,78 @@
+--| Expand a proof into a string
+do {(def (expand p) (begin (have 'expanded-term p) (pp @ infer-type 'expanded-term)))};
+do {
+    (def dbg @ match-fn* [(x) (print x) x]
+    [(x y) (display @ string-append (->string x) ": " (->string y)) y])
+};
+
+
+--annotations look nice, but the proof is again not easy to use
+do {
+  (def last (match-fn [(a) a] [(_ . l) (last l)]))
+  (def (annotate e s) @ match e [_ (print @ last @ get-decl s)])
+};
+
+theorem contrad_i (a b: wff) (h: $~a$): $a -> b$ = (
+  focus
+  -- uncommenting display below breaks the proof :(
+  (display @ expand 'a1i)
+  -- (display @ expand '(! a1i $~a$ $~b$ h))
+  (have 'c $~b -> ~a$ '(a1_i h))  -- remove h here and see how the error is uninformative
+  --(have 'd $a -> b$ '(! a3i b a c))
+  --(display @ pp @ local-ctx)
+  --(stat)
+  --(claim 'c $~b -> ~a$ '(a1i h))  -- remove h here and see how the error is uninformative
+  '(a3_i c)
+  --(have 'd $a -> b$ '(! a3i b a c))
+  --'d
+);
+
+
+
+-- add theorem through do-block
+-- do {
+--   (add-thm!
+--     'teste
+--     '[(a wff ()) (b wff ())]
+--     '([h1 $a -> b$] [h2 $b -> a$])
+--     $(a -> b) /\ (b -> a)$
+--     ()
+--     (fn () '(() (build_conj_i $a -> b$ $b -> a$ h1 h2)))
+--   )
+--   (print @ get-decl 'teste2)
+-- };
+do {
+  (print (get-decl 'repl_equiv_conj_l_i))
+  (add-term! 'a '[(a wff ())] 'wff)
+  (add-term! 'b '[(b wff ())] 'wff)
+  (add-thm! 'h1 '[(a wff ()) (b wff ())] () '($a -> b$))
+  (add-thm! 'h2 '[(a wff ()) (b wff ())] () '($b -> a$))
+  (set-goals (goal $a <-> b$))
+  (print @ get-goals)
+  (refine '(build_conj_i h1 h2))
+  (print @ get-goals)
+};
+
+
+
+-- do {
+--   (def dbg @ match-fn* [(x) (print x) x]
+--     [(x y) (display @ string-append (->string x) ": " (->string y)) y])
+--   (def last (match-fn [(a) a] [(_ . l) (last l)]))
+--   (let ([p (last @ get-decl 'mp_d)])
+--     (print (p))
+--     )
+-- };
+
+-- I don't know how to get the proof from get-decl:
+-- do {
+--   (def last (match-fn [(a) a] [(_ . l) (last l)]))
+--   (add-decl!
+--   'theorem 'triple_conj_aa '((a wff ()) (b wff ()) (c wff ())) '((h (an (an a b) c))) 'a '() '(codj_impl_l_i (conj_impl_l_i h)))
+--   (print (get-decl 'mp_d))
+--   (let ([p (last @ get-decl 'mp_d)])
+--     (p))
+--     (print @ infer-type p)
+--   )
+--   (print @ ref! @ last @ get-decl 'mp_d)
+-- };
