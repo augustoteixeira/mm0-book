@@ -1,0 +1,79 @@
+import "intro_propos_calc.mm1";
+
+--- ### Tactic for deduction?
+
+do { (def temp (ref!)) };
+
+do {
+  (def (rec-s-expr x)
+    (begin
+      (set! temp x)
+      x)
+  )
+};
+do {
+  (def (rec-proof x)
+    (begin
+      (set! temp x)
+      x)
+  )
+};
+
+
+
+do {
+  (def (convert_i_d x)
+    (string->atom @ convert_i_d @ ->string x)
+    (if (not @ string? x) (error "Tried to convert non string")
+      (let ([l (string-len x)])
+        (if {l <= 2} x
+          (let ([prefix (substr 0 {l - 2} x)] [sufix (substr {l - 2} l x)])
+            (if (== sufix "_i")
+              (string-append prefix "_d")
+              (if {x == "syl"} "syl_d" x)
+            )
+          )
+        )
+      )
+    )
+  )
+  -- (print @ convert_i_d "asfdx")
+  -- (print @ convert_i_d "asfdx_i")
+};
+
+do {
+  (def (convert_to_deduction x)
+    (match x
+      [() ()]
+      [(h . t) '(,(convert_to_deduction h) . ,(convert_to_deduction t))]
+      [a
+        (if (atom? x)
+          (string->atom @ convert_i_d @ ->string x)
+          x)]))
+  -- (print @ id2 '())
+  -- (print @ id2 'a)
+  -- (print @ id2 '(b_i))
+  -- (print @ id2 '(c_c d_i))
+  -- (print @ id2 '(e (f_i)))
+  -- (print @ id2 '((g) h))
+};
+
+
+
+-- testing tactics
+theorem _ (h: $a -> ~b$): $b -> ~a$ = (rec-s-expr '(
+  a3_i (syl notnotr h)
+));
+-- in order to build deduction from another proof, tautologies get an antecedent through a1i:
+--theorem _ (h: $u -> a -> ~b$): $u -> b -> ~a$ = temp;
+
+
+
+-- theorem _ (a b c: wff)
+--   (h1: $a <-> b$) (h2: $a -> c$): $b -> c$ = (record '(
+--     syl (equiv_impl_r_i h1) h2
+--   ));
+-- theorem _ (a b c: wff)
+--   (h1: $a <-> b$) (h2: $a -> c$): $b -> c$ = temp;
+-- theorem _ (u a b c: wff)
+--   (h1: $u -> (a <-> b)$) (h2: $u -> (a -> c)$): $u -> (b -> c)$ = (convert_to_deduction temp);

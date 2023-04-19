@@ -1,0 +1,410 @@
+delimiter $ ( ) ~ { } $;
+strict provable sort wff;
+
+-- # Well Formed Formulas
+
+-- TODO: Add explanation
+
+term wi (a b: wff): wff;
+infixr wi: $->$ prec 25;
+
+term wn (a: wff): wff;
+prefix wn: $~$ prec 40;
+
+-- # Axioms
+
+-- TODO: Add explanation
+
+--| Axiom 1 of Lukasiewicz' axioms for classical propositional logic.
+axiom ax_1 (a b: wff): $a -> b -> a$;
+--| Axiom 2 of Lukasiewicz' axioms for classical propositional logic.
+axiom ax_2 (a b c: wff): $(a -> (b -> c)) -> ((a -> b) -> (a -> c))$;
+--| Axiom 3 of Lukasiewicz' axioms for classical propositional logic.
+axiom ax_3 (a b: wff): $(~a -> ~b) -> b -> a$;
+--| Modus ponens: from `a -> b` and `a`, infer `b`.
+axiom ax_mp (a b: wff) (h1: $a$) (h2: $a -> b$): $b$;
+
+-- # Theorem Forms
+
+-- TODO: Add explanation
+
+-- ## Inference Form
+
+-- First proof (! notation)
+theorem a1_i (a b: wff) (h: $a$): $b -> a$ = (
+  focus
+  '(! ax_mp a $b -> a$ h (! ax_1 a b))
+);
+-- Explain unification and proofs without !
+theorem _ (a b: wff) (h: $a$): $b -> a$ = '(ax_mp h ax_1);
+theorem a2_i (a b: wff) (h: $a -> b -> c$): $(a -> b) -> (a -> c)$ = '(ax_mp h ax_2);
+theorem a3_i (a b: wff) (h: $~a -> ~b$): $(b -> a)$ = '(ax_mp h ax_3);
+
+-- ## Deduction Form
+
+theorem mp_d (u a b: wff) (h1: $u -> a$) (h2: $u -> a -> b$): $u -> b$ = '(ax_mp h1 (a2_i h2));
+-- Explain focus/have
+theorem syl (a b: wff) (h1: $a -> b$) (h2: $b -> c$): $a -> c$ = (
+  focus
+  (have 'c1 $a -> (b -> c)$ '(a1_i h2))
+  '(mp_d h1 c1)
+);
+-- To obtain deduction form here, just use syl
+theorem a1_d (a b c: wff) (h: $a -> b$): $a -> (c -> b)$ = '(syl h ax_1);
+theorem a2_d (u a b c: wff) (h: $u -> (a -> (b -> c))$): $u -> ((a -> b) -> (a -> c))$ = '(syl h ax_2);
+theorem a3_d (a b c: wff) (h: $a -> (~b -> ~c)$): $a -> (c -> b)$ = '(syl h ax_3);
+
+
+theorem id: $a -> a$ = (
+  focus
+  (have 'h1 $a -> (a -> a)$ 'ax_1)
+  (have 'h2 $a -> ((a -> a) -> a)$ 'ax_1)
+  '(mp_d h1 h2)
+);
+
+-- # Contradiction
+
+--| contradiction implies anything
+theorem contrad_i (a b: wff) (h: $~a$): $a -> b$ = (
+  focus
+  (have 'c $~b -> ~a$ '(a1_i h))  -- remove h here and see how the error is uninformative
+  '(a3_i c)
+);
+--| contradiction deduction
+-- Explain how to obtain it by just using deduction form everywhere
+theorem contrad_d (u a b: wff) (h: $u -> ~a$): $u -> a -> b$ = (
+  focus
+  (have 'c $u -> (~b -> ~a)$ '(a1_d h))
+  '(a3_d c) -- a simpler proof '(a3d (a1d h))
+);
+--| contradiction closed form
+-- Explain how one can obtain closed forms by replacing u with id.
+theorem contrad_c (a b: wff): $~a -> a -> b$ = '(contrad_d id);
+
+-- # Workout!
+
+-- Explain that this section is slightly cryptic and why. Say that
+-- we don't have the intuitive stuff yet and we are solving puzzles
+-- until we get there.
+--| absorbing redundant antecedent
+theorem redun_ant (a b: wff) (h: $a -> a -> b$): $a -> b$ = (
+  focus
+  (have 'c $a -> a$ 'id)
+  '(mp_d c h)
+);
+
+-- mirabilis: pm2.18
+theorem mirab (a: wff): $(~a -> a) -> a$ = (
+  focus
+  (have 'c1 $~a -> a -> ~(~a -> a)$ '(! contrad_c $a$ $~(~a -> a)$))
+  (have 'c2 $(~a -> a) -> (~a -> ~(~a -> a))$ '(a2_i c1))
+  (have 'c3 $(~a -> a) -> (~a -> a) -> a$ '(a3_d c2))
+  '(redun_ant c3)
+);
+
+--| elimiation of a nested antecedent
+theorem elim_nest_ant (a b c: wff) (h: $(a -> b) -> c$): $~a -> c$ = (
+  focus
+  (have 'c $~a -> a -> b$ 'contrad_c)
+  '(syl c h)
+);
+
+--| notnotr
+theorem notnotr (a: wff): $~~a -> a$ = (
+  focus
+  (have 'c $(~a -> a) -> a$ '(! mirab $a$))
+  '(elim_nest_ant c)
+);
+
+theorem notnot (a: wff): $a -> ~~a$ = (
+  focus
+  (have 'c $~~~a -> ~a$ 'notnotr)
+  '(a3_i c)
+);
+
+--| negated implication gives antecedent
+-- Note that it can be nice to start with closed form, then do i and d.
+-- Specially now that the theory is not mature yet.
+theorem not_impl_ant_c (a b: wff): $~(a -> b) -> a$ = (
+  focus
+  (have 'c1 $~a -> a -> b$ 'contrad_c)
+  (have 'c2 $(a -> b) -> ~~(a -> b)$ 'notnot)
+  (have 'c3 $~a -> ~~(a -> b)$ '(syl c1 c2))
+  '(a3_i c3)
+);
+theorem not_impl_ant_i (a b: wff) (h: $~(a -> b)$): $a$ = '(ax_mp h not_impl_ant_c);
+theorem not_impl_ant_d (u a b: wff) (h: $u -> ~(a -> b)$): $u -> a$ = '(mp_d h (a1_i not_impl_ant_c));
+
+--| negated implication negates consequent
+-- Again starting with closed form.
+theorem not_impl_cons_c (a b: wff): $~(a -> b) -> ~b$ = (
+  focus
+  (have 'c1 $b -> (a -> b)$ 'ax_1)
+  (have 'c2 $~~b -> (a -> b)$ '(syl notnotr c1))
+  (have 'c3 $~~b -> ~~(a -> b)$ '(syl c2 notnot))
+  '(a3_i c3)
+);
+theorem not_impl_cons_i (a b: wff) (h: $~(a -> b)$): $~b$ = '(ax_mp h not_impl_cons_c);
+theorem not_impl_cons_d (u a b: wff) (h: $u -> ~(a -> b)$): $u -> ~b$ = '(mp_d h (a1_i not_impl_cons_c));
+
+theorem commute_ant_i (a b c: wff) (h: $a -> b -> c$): $b -> a -> c$ = (
+  focus
+  (have 'c1 $(a -> b) -> (a -> c)$ '(a2_i h))
+  (have 'c2 $b -> (a -> b)$ 'ax_1)
+  '(syl c2 c1)
+);
+
+-- try to prove closed form way above, using deduction form
+-- it is difficult because we need h1 /\ h2. But we may
+-- move conjuction above
+theorem mp_c (a b: wff): $a -> (a -> b) -> b$ = '(
+  commute_ant_i (! id $a -> b$)
+);
+
+-- # Double deduction
+
+-- Explain the concept, mention the fear that we would need triple...
+-- but in fact we will have conjunction to save the day. For now
+-- we still need one double deduction.
+
+theorem mp_dd (u v a b: wff)
+  (h1: $u -> v -> a$) (h2: $u -> v -> a -> b$): $u -> v -> b$ = '(
+    mp_d h1 (a2_d h2)
+  );
+-- syl deduction (recall syl used mp_d already, now we need mp_dd)
+theorem syl_d (u a b: wff)
+  (h1: $u -> (a -> b)$) (h2: $u -> (b -> c)$): $u -> (a -> c)$ = (
+    focus
+    (have 'c $u -> a -> b -> c$ '(a1_d h2))
+    '(mp_dd h1 c)
+);
+-- exercise: prove syl_dd
+
+
+-- # Contraposition
+
+theorem contrap_i (h: $a -> b$): $~b -> ~a$ = (
+  focus
+  (have 'c1 $~~a -> b$ '(syl notnotr h))
+  (have 'c2 $~~a -> ~~b$ '(syl c1 notnot))
+  '(a3_i c2)
+);
+-- look, it is just translation!!!
+theorem contrap_d (h: $u -> a -> b$): $u -> ~b -> ~a$ = '(
+  a3_d (syl_d (syl_d (a1_i notnotr) h) (a1_i notnot))
+);
+theorem contrap_c: $(a -> b) -> (~b -> ~a)$ = '(contrap_d id);
+
+theorem contrap_not_cons_i (h: $a -> ~b$): $b -> ~a$ = (
+  focus
+  (have 'c $~~a -> ~b$ '(syl notnotr h))
+  '(a3_i c)
+);
+-- in order to build deduction from another proof, tautologies get an antecedent through a1i:
+theorem contrap_not_cons_d (h: $u -> a -> ~b$): $u -> b -> ~a$ =
+  '(a3_d (syl_d (a1_i notnotr) h)
+);
+theorem contrap_not_cons_c: $(a -> ~b) -> b -> ~a$ =
+  '(contrap_not_cons_d id);
+
+theorem contrap_not_ant_i (h: $~a -> b$): $~b -> a$ = (
+  focus
+  (have 'c $~a -> ~~b$ '(syl h notnot))
+  '(a3_i c)
+);
+-- again, tautologies get an antecedent through a1i:
+theorem contrap_not_ant_d (h: $u -> ~a -> b$): $u -> ~b -> a$ =
+  '(a3_d (syl_d h (a1_i notnot))
+);
+theorem contrap_not_ant_c: $(~a -> b) -> ~b -> a$ =
+  '(contrap_not_ant_d id);
+
+
+-- # Conjunction
+
+--| Conjunction: `a` and `b` are both true.
+def an (a b: wff): wff = $~(a -> ~b)$;
+infixl an: $/\$ prec 34;
+
+theorem conj_impl_l_i (h: $a /\ b$): $a$ = '(not_impl_ant_i h);
+theorem conj_impl_l_d (h: $u -> a /\ b$): $u -> a$ = '(not_impl_ant_d h);
+theorem conj_impl_l_c: $(a /\ b) -> a$ = 'not_impl_ant_c;
+
+theorem conj_impl_r_c: $(a /\ b) -> b$ = (
+  focus
+  (have 'c $(a /\ b) -> ~~b$ 'not_impl_cons_c)
+  '(syl c notnotr)
+);
+theorem conj_impl_r_i (h: $a /\ b$): $b$ = '(ax_mp h conj_impl_r_c);
+theorem conj_impl_r_d (h: $u -> a /\ b$): $u -> b$ = '(mp_d h (a1_i conj_impl_r_c));
+
+-- Build conjunction in closed form
+theorem build_conj_c: $a -> b -> a /\ b$ = (
+  focus
+  (have 'c $a -> (a -> ~b) -> ~b$ 'mp_c)
+  '(contrap_not_cons_d c)
+);
+theorem build_conj_i
+  (h1: $a$) (h2: $b$): $a /\ b$ = (
+  focus
+  (have 'c $b -> a /\ b$ '(ax_mp h1 build_conj_c))
+  '(ax_mp h2 c)
+);
+
+-- confirms intuition that double antecedent acts as conj
+theorem repl_two_and_conj (h: $a -> b -> c$): $a /\ b -> c$ = (
+  focus
+  (have 'c1 $a /\ b -> a$ 'conj_impl_l_c)
+  (have 'c2 $a /\ b -> b -> c$ '(syl c1 h))
+  (have 'c3 $a /\ b -> b$ 'conj_impl_r_c)
+  '(mp_d c3 c2)
+);
+
+-- Recall the discussion about double conjunction. Say that we are finally
+-- obtaining the last ingredient to remove the need for this.
+
+-- kind of converse of repl_two_and_conj
+theorem repl_conj_two_ant (a b c: wff) (h: $a /\ b -> c$): $a -> b -> c$ = (
+  focus
+  (have 'c1 $a -> b -> a /\ b$ 'build_conj_c)
+  (have 'c2 $a -> a /\ b -> c$ '(a1_i h))
+  '(syl_d c1 c2)
+);
+
+-- explain how build conjunction can help with double (or triple...) deduction
+theorem contrap_dd (h: $u -> v -> a -> ~b$): $u -> v -> b -> ~a$ = (
+  focus
+  (have 'c1 $u /\ v -> a -> ~b$ '(repl_two_and_conj h))
+  (have 'c2 $u /\ v -> b -> ~a$ '(contrap_not_cons_d c1))
+  '(repl_conj_two_ant c2)
+);
+
+-- improve the explanation of how to decude this. Probably try to prove _i without _c first
+theorem build_conj_d
+  (h1: $u -> a$) (h2: $u -> b$): $u -> a /\ b$ = (
+    focus
+    (have 'c1 $u -> a -> (a -> ~b) -> ~b$ '(a1_i mp_c))
+    (have 'c2 $u -> a -> b -> a /\ b$ '(contrap_dd c1)) -- It took me a long time to find out this missing c1
+    (have 'c3 $u -> b -> a /\ b$ '(mp_d h1 c2))
+    '(mp_d h2 c3)
+);
+
+theorem conj_commut_i (h: $a /\ b$): $b /\ a$ = (
+  focus
+  (have 'c1 $a$ '(conj_impl_l_i h))
+  (have 'c2 $b$ '(conj_impl_r_i h))
+  '(build_conj_i c2 c1) -- note the inverted order
+);
+theorem conj_commut_d (u a b: wff) (h: $u -> a /\ b$): $u -> b /\ a$ = '(
+  build_conj_d (conj_impl_r_d h) (conj_impl_l_d h)
+);
+theorem conj_commut_c: $a /\ b -> b /\ a$ = (
+  focus
+  (have 'c1 $a /\ b -> a$ 'conj_impl_l_c)
+  (have 'c2 $a /\ b -> b$ 'conj_impl_r_c)
+  '(build_conj_d c2 c1)
+);
+
+-- turn the below into exercises:
+-- theorem triple_conj_a (h: $a /\ b /\ c$): $a$ = (
+--   focus
+--   (have 'c $a /\ b$ '(conj_impl_l_i h))
+--   '(conj_impl_l_i c)
+-- );
+-- theorem triple_conj_b (h: $a /\ b /\ c$): $b$ =
+--   '(conj_impl_r_i (conj_impl_l_i h));
+-- theorem triple_conj_c (h: $a /\ b /\ c$): $c$ =
+--   '(conj_impl_r_i h);
+
+
+-- # Disjunction + Cases
+
+
+--| Definition of disjunction (a or b)
+def or (a b: wff): wff = $~a -> b$;
+infixl or: $\/$ prec 30;
+
+theorem disj_from_l_c: $a -> a \/ b$ = (
+  focus
+  (have 'c $~~a -> ~a -> b$ 'contrad_c)
+  '(syl notnot c)
+);
+theorem disj_from_l_i (h: $a$): $a \/ b$ = (
+  focus
+  (have 'c $~~a$ '(ax_mp h notnot))
+  '(contrad_i c)
+);
+theorem disj_from_l_d (h: $u -> a$): $u -> a \/ b$ = (
+  focus
+  (have 'c $u -> ~~a$ '(mp_d h (a1_i notnot)))
+  '(contrad_d c)
+);
+
+-- much easier for right:
+theorem disj_from_r_c (a b: wff): $b -> a \/ b$ = 'ax_1;
+theorem disj_from_r_i (a b: wff) (h: $b$): $a \/ b$ = '(a1_i h);
+theorem disj_from_r_d (u a b: wff) (h: $u -> b$): $u -> a \/ b$ = '(a1_d h);
+
+-- now commutation gets easier starting with closed form:
+theorem disj_commut_c (a b: wff): $a \/ b -> b \/ a$ = (
+  focus
+  (have 'qed $(~a -> b) -> ~b -> a$ 'contrap_not_ant_c)
+  'qed
+);
+theorem disj_commut_i (a b: wff) (h: $a \/ b$): $b \/ a$ = '(ax_mp h disj_commut_c);
+theorem disj_commut_d (a b: wff) (h: $u -> (a \/ b)$): $u -> (b \/ a)$ = '(mp_d h (a1_i disj_commut_c));
+
+theorem disj_not_l_impl_r_i (a b: wff)
+  (h1: $a \/ b$) (h2: $~a$): $b$ = '(ax_mp h2 h1);
+theorem disj_not_l_impl_r_d (u a b: wff)
+  (h1: $u -> (a \/ b)$) (h2: $u -> ~a$): $u -> b$ = '(mp_d h2 h1);
+theorem disj_not_l_impl_r_ci (a b: wff)
+  (h: $a \/ b$): $~a -> b$ = '(disj_not_l_impl_r_d (a1_i h) id);
+
+theorem disj_not_r_impl_l_i (a b: wff)
+  (h1: $a \/ b$) (h2: $~b$): $a$ = (
+    focus
+    (have 'c $b \/ a$ '(disj_commut_i h1))
+    '(disj_not_l_impl_r_i c h2)
+);
+
+-- ## Cases
+
+theorem cases_i (a b: wff) (h1: $a -> b$) (h2: $~a -> b$): $b$ = (
+  focus
+  (have 'c1 $~b -> ~a$ '(contrap_i h1))
+  (have 'c2 $~b -> b$ '(syl c1 h2))
+  (have 'c3 $(~b -> b) -> b$ 'mirab)
+  '(ax_mp c2 c3)
+);
+theorem cases_d (u a b: wff)
+  (h1: $u -> (a -> b)$) (h2: $u -> (~a -> b)$): $u -> b$ = '(
+  mp_d (syl_d (contrap_d h1) h2) (a1_i mirab)
+);
+-- think if we want to do the closed form now. There is the
+-- discussion abount contracting more than one hypotheses.
+-- theorem cases_c (a b: wff): $(a -> b) -> (~a -> b) -> b$ = '();
+
+theorem either_impl_disj_impl_i (a b c: wff)
+  (h1: $a -> c$) (h2: $b -> c$): $(a \/ b) -> c$ = (
+  focus
+  -- we will use cases, first case: a
+  (have 'c1 $a -> (a \/ b) -> c$ (
+    begin
+    (have 's1 $(a \/ b) -> a -> c$ '(a1_i h1))
+    '(commute_ant_i s1)))
+  -- we will use cases, second case: ~a
+  (have 'c2 $~a -> (a \/ b) -> c$ (
+    begin
+    (have 's2 $~a -> (~a -> b) -> b$ 'mp_c)
+    -- encapsulate the two antecedents into a single formula to use sylogism
+    (have 's3 $(~a /\ (~a -> b)) -> b$ '(repl_two_and_conj s2))
+    (have 's4 $(~a /\ (~a -> b)) -> c$ '(syl s3 h2))
+    '(repl_conj_two_ant s4)))
+  '(cases_i c1 c2)
+);
+
+-- exercise
+--theorem eorda (h1: $a /\ b -> d$) (h2: $a /\ c -> d$):
+--  $a -> b \/ c -> d$ = '(eord (exp h1) (exp h2));
+

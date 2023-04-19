@@ -1,0 +1,258 @@
+import "intro_propos_calc.mm1";
+
+import "deduction_tactic.mm1";
+
+-- # Equivalence
+
+--| If and only if: `a` implies `b`, and `b` implies `a`.
+def iff (a b: wff): wff = $(a -> b) /\ (b -> a)$;
+infixl iff: $<->$ prec 20;
+
+-- ## Using equivalences
+
+-- we have already done the hard work when we proved theorems for conjunctions:
+theorem equiv_impl_l_c (a b: wff): $(a <-> b) -> (a -> b)$ = 'conj_impl_l_c;
+theorem equiv_impl_l_i (a b: wff) (h: $a <-> b$): $a -> b$ = '(ax_mp h equiv_impl_l_c);
+theorem equiv_impl_l_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (a -> b)$ = '(mp_d h (a1_i equiv_impl_l_c));
+
+theorem equiv_impl_r_c (a b: wff): $(a <-> b) -> (b -> a)$ = 'conj_impl_r_c;
+theorem equiv_impl_r_i (a b: wff) (h: $a <-> b$): $b -> a$ = '(ax_mp h equiv_impl_r_c);
+theorem equiv_impl_r_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (b -> a)$ = '(mp_d h (a1_i equiv_impl_r_c));
+
+theorem equiv_impl_both_c (a b: wff): $(a <-> b) -> (a -> b) /\ (b -> a)$ = '(build_conj_d conj_impl_l_c conj_impl_r_c);
+theorem equiv_impl_both_i (a b: wff) (h: $a <-> b$): $(a -> b) /\ (b -> a)$ = '(ax_mp h equiv_impl_both_c);
+theorem equiv_impl_both_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (a -> b) /\ (b -> a)$ = '(mp_d h (a1_i equiv_impl_both_c));
+
+
+-- ## Building equivalences
+theorem build_equiv_i (a b: wff)
+  (h1: $a -> b$) (h2: $b -> a$): $a <-> b$ = '(build_conj_i h1 h2);
+theorem build_equiv_d (u a b: wff)
+  (h1: $u -> (a -> b)$) (h2: $u -> (b -> a)$): $u -> (a <-> b)$ = '(build_conj_d h1 h2);
+-- explain what is being done (extract hipotheses one by one)
+-- explain the use of let to introduce notation
+theorem build_equiv_c (a b: wff): $((a -> b) /\ (b -> a)) -> (a <-> b)$ = (
+  let ([x $a -> b$] [y $b -> a$]) (
+  focus
+  (have 'c1 $,x /\ ,y -> ,x$ 'conj_impl_l_c)
+  (have 'c2 $,x /\ ,y -> ,y$ 'conj_impl_r_c)
+  '(build_equiv_d c1 c2)
+));
+
+-- ## Basic properties
+theorem equiv_commut_i (a b: wff) (h: $a <-> b$): $b <-> a$ = '(conj_commut_i h);
+theorem equiv_commut_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (b <-> a)$ = '(conj_commut_d h);
+theorem equiv_commut_c (a b: wff): $(a <-> b) -> (b <-> a)$ = '(equiv_commut_d id);
+
+theorem equiv_syl_i (a b c: wff)
+  (h1: $a <-> b$) (h2: $b <-> c$): $a <-> c$ = (
+  focus
+  (have 'c1 $a -> c$ '(syl (equiv_impl_l_i h1) (equiv_impl_l_i h2)))
+  (have 'c2 $c -> a$ '(syl (equiv_impl_r_i h2) (equiv_impl_r_i h1)))
+  '(build_equiv_i c1 c2)
+);
+
+
+-- # Equivalences and Other Operators
+
+
+-- ## Not
+
+theorem notnot_equiv: $a <-> ~~a$ = '(build_equiv_i notnot notnotr);
+
+theorem equiv_equiv_not_i (a b: wff) (h: $a <-> b$): $~a <-> ~b$ = (
+  focus
+  (have 'c1 $b -> a$ '(equiv_impl_r_i h))
+  (have 'c2 $~a -> ~b$ '(contrap_i c1))
+  (have 'c3 $a -> b$ '(equiv_impl_l_i h))
+  (have 'c4 $~b -> ~a$ '(contrap_i c3))
+  '(build_equiv_i c2 c4)
+);
+-- again, just translate to get deduction!!!
+theorem equiv_equiv_not_d (u a b: wff) (h: $u -> (a <-> b)$): $u -> (~a <-> ~b)$ = '(
+  build_equiv_d (contrap_d (equiv_impl_r_d h)) (contrap_d (equiv_impl_l_d h))
+);
+theorem equiv_equiv_not_c: $ (a <-> b) -> (~a <-> ~b) $ = '(equiv_equiv_not_d id);
+
+-- ## Implication
+
+theorem repl_equiv_cons_i (c a b: wff)
+  (h1: $a <-> b$) (h2: $c -> a$): $c -> b$ = (
+    focus
+    (have 'c $a -> b$ '(equiv_impl_l_i h1))
+    '(syl h2 c)
+); -- was this easier to prove because of inference form?
+-- just copy...
+theorem repl_equiv_cons_d (u a b c: wff)
+  (h1: $u -> (a <-> b)$) (h2: $u -> (c -> a)$): $u -> (c -> b)$ = '(
+  syl_d h2 (equiv_impl_l_d h1)
+);
+-- explain extraction of hypotheses using conjunction
+theorem repl_equiv_cons_c (a b c: wff): $((a <-> b) /\ (c -> a)) -> (c -> b)$ = '(
+  repl_equiv_cons_d conj_impl_l_c conj_impl_r_c
+);
+
+-- explain that one can contract a single hypothesis
+theorem repl_equiv_cons_ci (a b c: wff)
+  (h: $(a <-> b)$): $(c -> a) -> (c -> b)$ = '(
+  ax_mp h (repl_conj_two_ant repl_equiv_cons_c)
+);
+theorem equiv_cons_equiv_impl_i (a b c: wff) (h: $a <-> b$): $(c -> a) <-> (c -> b)$ = (
+  focus
+  (have 'c1 $(c -> a) -> (c -> b)$ '(repl_equiv_cons_ci h))
+  (have 'c2 $b <-> a$ '(equiv_commut_i h))
+  (have 'c3 $(c -> b) -> (c -> a)$ '(repl_equiv_cons_ci c2))
+  '(build_equiv_i c1 c3)
+);
+
+theorem repl_equiv_ant_i (a b c: wff)
+  (h1: $a <-> b$) (h2: $a -> c$): $b -> c$ = (
+    focus
+    (have 'c $b -> a$ '(equiv_impl_r_i h1))
+    '(syl c h2)
+);
+-- we should always use u for deduction form!!!
+theorem repl_equiv_ant_d (u a b c: wff)
+  (h1: $u -> (a <-> b)$) (h2: $u -> (a -> c)$): $u -> (b -> c)$ = '(
+    syl_d (equiv_impl_r_d h1) h2
+  );
+-- mention hypotheses extraction
+theorem repl_equiv_ant_c (a b c: wff): $(a <-> b) /\ (a -> c) -> (b -> c)$ = '(  -- add u in (a b c: wff) and see the weird error elsewhere
+  repl_equiv_ant_d conj_impl_l_c conj_impl_r_c
+);
+-- contract a single hypothesis again
+theorem repl_equiv_ant_ci (a b c: wff)
+  (h: $(a <-> b)$): $(a -> c) -> (b -> c)$ = '(
+  ax_mp h (repl_conj_two_ant repl_equiv_ant_c)
+);
+
+theorem equiv_ant_equiv_impl_i (a b c: wff) (h: $a <-> b$): $(a -> c) <-> (b -> c)$ = (
+  focus
+  (have 'c1 $(a -> c) -> (b -> c)$ '(repl_equiv_ant_ci h))
+  (have 'c2 $b <-> a$ '(equiv_commut_i h))
+  (have 'c3 $(b -> c) -> (a -> c)$ '(repl_equiv_ant_ci c2))
+  '(build_equiv_i c1 c3)
+);
+
+
+
+-- ## Conjunction
+
+
+
+theorem conj_commut_equiv_c (a b: wff): $a /\ b <-> b /\ a$ = (
+  focus
+  (have 'c1 $(a /\ b) -> (b /\ a)$ 'conj_commut_c)
+  (have 'c2 $(b /\ a) -> (a /\ b)$ 'conj_commut_c)
+  '(build_equiv_i c1 c2)
+);
+
+theorem repl_equiv_conj_l_i (a b c: wff)
+  (h1: $a <-> b$) (h2: $a /\ c$): $b /\ c$ = (record @
+  focus
+  (have 'c1 $a$ '(conj_impl_l_i h2))
+  (have 'c2 $b$ '(ax_mp c1 (equiv_impl_l_i h1)))
+  (have 'c3 $c$ '(conj_impl_r_i h2))
+  '(build_conj_i c2 c3)
+);
+-- by now we should already have a tactic to obtain deductions
+theorem repl_equiv_conj_l_d (u a b c: wff)
+  (h1: $u -> (a <-> b)$) (h2: $u -> (a /\ c)$): $u -> (b /\ c)$ = '(
+  build_conj_d (mp_d (conj_impl_l_d h2) (equiv_impl_l_d h1)) (conj_impl_r_d h2)
+);
+-- this one was a bit complicated with the a1_i
+-- the explation is: every hypotheses that is not encapsulated gets an a1_i
+theorem repl_equiv_conj_l_ci (a b c: wff)
+  (h: $a <-> b$): $(a /\ c) -> (b /\ c)$ = '(
+  repl_equiv_conj_l_d (a1_i h) id
+);
+theorem equiv_l_term_equiv_conj_i (a b c: wff)
+  (h: $a <-> b$): $(a /\ c) <-> (b /\ c)$ = (
+  focus
+  (have 'c1 $(a /\ c) -> (b /\ c)$ '(repl_equiv_conj_l_ci h))
+  (have 'c2 $b <-> a$ '(equiv_commut_i h))
+  (have 'c3 $(b /\ c) -> (a /\ c)$ '(repl_equiv_conj_l_ci c2))
+  '(build_equiv_i c1 c3)
+);
+
+-- the left side follows using commutativity only
+theorem repl_equiv_conj_r_d (u a b c: wff)
+  (h1: $u -> (a <-> b)$) (h2: $u -> (c /\ a)$): $u -> (c /\ b)$ = (
+  focus
+  (have 'c1 $u -> a /\ c$ '(conj_commut_d h2))
+  (have 'c2 $u -> b /\ c$ '(repl_equiv_conj_l_d h1 c1))
+  '(conj_commut_d c2)
+);
+theorem repl_equiv_conj_r_ci (a b c: wff)
+  (h: $a <-> b$): $(c /\ a) -> (c /\ b)$ = '(
+  repl_equiv_conj_r_d (a1_i h) id
+);
+-- let us also use commutativity to replace the right term using replacement of left:
+theorem equiv_r_term_equiv_conj_i (a b c: wff)
+  (h: $a <-> b$): $(c /\ a) <-> (c /\ b)$ = (
+  focus
+  (have 'c1 $(c /\ a) <-> (a /\ c)$ 'conj_commut_equiv_c)
+  (have 'c2 $(a /\ c) <-> (b /\ c)$ '(equiv_l_term_equiv_conj_i h))
+  (have 'c3 $(c /\ a) <-> (b /\ c)$ '(equiv_syl_i c1 c2))
+  (have 'c4 $(b /\ c) <-> (c /\ b)$ 'conj_commut_equiv_c)
+  '(equiv_syl_i c3 c4)
+);
+
+
+-- ## Disjunction
+
+theorem disj_commut_equiv_c (a b: wff): $a \/ b <-> b \/ a$ = (
+  focus
+  (have 'c1 $(a \/ b) -> (b \/ a)$ 'disj_commut_c)
+  (have 'c2 $(b \/ a) -> (a \/ b)$ 'disj_commut_c)
+  '(build_equiv_i c1 c2)
+);
+
+theorem repl_equiv_disj_l_i (a b c: wff)
+  (h1: $a <-> b$) (h2: $a \/ c$): $b \/ c$ = (
+  focus
+  -- consider two cases, a and ~a:
+  (have 'c3 $a -> (b \/ c)$
+    (begin
+      (have 'c1 $a -> b$ '(equiv_impl_l_i h1))
+      (have 'c2 $b -> (b \/ c)$ 'disj_from_l_c)
+      '(syl c1 c2)))
+  (have 'c6 $~a -> (b \/ c)$
+    (begin
+      (have 'c4 $~a -> c$ '(disj_not_l_impl_r_ci h2))
+      (have 'c5 $c -> (b \/ c)$ 'disj_from_r_c)
+      '(syl c4 c5)))
+  '(cases_i c3 c6)
+);
+-- NOW WE BADLY NEED THE TACTIC TO BUILD DEDUCTIONS!!!!
+theorem repl_equiv_disj_l_d (u a b c: wff)
+  (h1: $u -> (a <-> b)$) (h2: $u -> (a \/ c)$): $u -> (b \/ c)$ = _;
+theorem repl_equiv_disj_l_c (a b c: wff)
+  (h: $a <-> b$): $(a \/ c) -> (b \/ c)$ = '(repl_equiv_disj_l_d (a1_i h) id);
+
+theorem equiv_l_term_equiv_disj_i (a b c: wff)
+  (h: $a <-> b$): $(a \/ c) <-> (b \/ c)$ = (
+  focus
+  (have 'c1 $(a \/ c) -> (b \/ c)$ '(repl_equiv_disj_l_c h))
+  (have 'c2 $b <-> a$ '(equiv_commut_i h))
+  (have 'c3 $(b \/ c) -> (a \/ c)$ '(repl_equiv_disj_l_c c2))
+  '(build_equiv_i c1 c3)
+);
+-- let us use commutativity to get the right substitution:
+theorem equiv_r_term_equiv_disj_i (a b c: wff)
+  (h: $a <-> b$): $(c \/ a) <-> (c \/ b)$ = (
+    focus
+    (have 'c1 $(c \/ a) <-> (a \/ c)$ 'disj_commut_equiv_c)
+    (have 'c2 $(a \/ c) <-> (b \/ c)$ '(equiv_l_term_equiv_disj_i h))
+    (have 'c3 $(c \/ a) <-> (b \/ c)$ '(equiv_syl_i c1 c2))
+    (have 'c4 $(b \/ c) <-> (c \/ b)$ 'disj_commut_equiv_c)
+    '(equiv_syl_i c3 c4)
+);
+
+-- exercise
+-- theorem iand (h1: $a -> b$) (h2: $a -> c$): $a -> b /\ c$ = '(sylc ian h1 h2);
+
+
+
+
+
